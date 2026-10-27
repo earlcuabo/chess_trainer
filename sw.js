@@ -1,12 +1,13 @@
 // Offline support: network first so updates show up right away, falling back
 // to the cached copy when there is no connection.
-const CACHE = 'chess-trainer-v2';
+const CACHE = 'chess-trainer-v3';
 const SHELL = [
   './',
   'index.html',
   'style.css',
   'manifest.webmanifest',
   'data/openings.json',
+  'data/freeplay.json',
   'src/app.js',
   'src/drill.js',
   'src/freeplay.js',

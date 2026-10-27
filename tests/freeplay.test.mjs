@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -7,6 +8,8 @@ import {
 } from '../tools/build_freeplay.mjs';
 import { Chess } from '../vendor/chess.js/chess.js';
 import { ACCEPT_CP, emptyFreeStats, formatScore, FreePlay, pickPuzzle, recordFreePlay, sideToMove } from '../src/freeplay.js';
+
+const root = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 
 const puzzle = {
   id: 'p1',
@@ -111,6 +114,32 @@ test('engine output parsing keeps the last full line per multipv and skips bound
     { depth: 11, score: 25, pv: ['d2d4', 'd7d5'] },
     { depth: 11, score: 29998, pv: ['e2e4'] },
   ]);
+});
+
+test('data/freeplay.json covers every selected position with legal engine moves', () => {
+  const { cards } = JSON.parse(readFileSync(join(root, 'data', 'openings.json'), 'utf8'));
+  const data = JSON.parse(readFileSync(join(root, 'data', 'freeplay.json'), 'utf8'));
+  const positions = selectPositions(cards);
+  assert.equal(data.count, data.puzzles.length);
+  assert.deepEqual(data.puzzles.map((p) => p.moves), positions.map((p) => p.moves));
+  assert.equal(new Set(data.puzzles.map((p) => p.id)).size, data.puzzles.length);
+  for (const puzzle of data.puzzles) {
+    assert.equal(puzzle.id, puzzleId(puzzle.moves));
+    assert.ok(puzzle.steps.length >= 1 && puzzle.steps.length <= STEPS, puzzle.id);
+    const chess = new Chess();
+    puzzle.moves.split(' ').forEach((san) => chess.move(san));
+    puzzle.steps.forEach((step, index) => {
+      assert.ok(step.top.length >= 1 && step.top.length <= MULTIPV, puzzle.id);
+      for (const [san, score] of step.top) {
+        assert.ok(Number.isInteger(score), puzzle.id);
+        chess.move(san);
+        chess.undo();
+      }
+      chess.move(step.top[0][0]);
+      if (index < puzzle.steps.length - 1) chess.move(step.reply);
+      else assert.equal(step.reply, undefined, puzzle.id);
+    });
+  }
 });
 
 test('puzzles are built step by step through a UCI engine', async () => {

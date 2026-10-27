@@ -203,8 +203,12 @@ async function main() {
   if (existsSync(args.cache)) {
     for (const line of readFileSync(args.cache, 'utf8').split('\n')) {
       if (!line) continue;
-      const entry = JSON.parse(line);
-      cache.set(entry.key, entry.lines);
+      try {
+        const entry = JSON.parse(line);
+        cache.set(entry.key, entry.lines);
+      } catch {
+        // A run stopped mid-write can leave a partial last line; redo it.
+      }
     }
   }
 
