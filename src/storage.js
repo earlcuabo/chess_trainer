@@ -1,5 +1,6 @@
 // Progress and settings persistence in localStorage, plus a JSON backup
 // format for export and import.
+import { emptyFreeStats, normalizeFreeStats } from './freeplay.js';
 import { DEFAULT_SETTINGS } from './srs.js';
 
 export const STORAGE_KEY = 'chess_trainer.v1';
@@ -7,7 +8,7 @@ export const BACKUP_FORMAT = 'chess_trainer_backup';
 export const BACKUP_VERSION = 1;
 
 export function emptyProgress() {
-  return { cards: {}, daily: null, settings: { ...DEFAULT_SETTINGS } };
+  return { cards: {}, daily: null, settings: { ...DEFAULT_SETTINGS }, freeplay: emptyFreeStats() };
 }
 
 export function normalizeSettings(settings = {}) {
@@ -19,6 +20,7 @@ export function normalizeSettings(settings = {}) {
   merged.promoteAfter = clampInt(merged.promoteAfter, 1, 10, DEFAULT_SETTINGS.promoteAfter);
   if (!['both', 'w', 'b'].includes(merged.side)) merged.side = DEFAULT_SETTINGS.side;
   if (!['slow', 'normal', 'fast'].includes(merged.speed)) merged.speed = DEFAULT_SETTINGS.speed;
+  if (!['learn', 'free'].includes(merged.mode)) merged.mode = DEFAULT_SETTINGS.mode;
   return merged;
 }
 
@@ -33,6 +35,7 @@ export function normalizeProgress(data) {
     cards: data.cards,
     daily: data.daily && typeof data.daily.day === 'number' ? data.daily : null,
     settings: normalizeSettings(data.settings),
+    freeplay: normalizeFreeStats(data.freeplay),
   };
 }
 

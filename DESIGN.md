@@ -22,6 +22,19 @@ Recorded from the owner's answers while designing the app.
 - **2026-10-27 — Chess site.** The owner plays on Chess.com. That only matters
   for the later game-import feature, which can use Chess.com's public games
   API with just a username.
+- **2026-10-27 — Free play.** A separate, unscheduled mode: find
+  Stockfish's best move in opening positions after a few pieces are developed.
+  A move within 0.20 pawns of the best counts as correct (the owner chose this
+  over "exact top move only"). Each position continues for up to 3 of the
+  user's moves with the engine replying (chosen over one move per position).
+- **2026-10-27 — Free play engine.** Stockfish's answers are calculated ahead
+  of time on pc2 and shipped as data, rather than running Stockfish on the
+  phone: instant, stronger, smaller download, works offline. Stockfish itself
+  is kept on pc2 only, not in this repository.
+- **2026-10-27 — No grade buttons.** A correct line is graded Good
+  automatically and the next card follows after a moment; the Good/Easy
+  buttons were removed at the owner's request. A missed line is graded Again
+  and waits for a Next tap so the miss can be read.
 
 ## Cards
 
@@ -54,10 +67,12 @@ mistake on it does not count.
 
 `src/srs.js` follows Anki's classic SM-2:
 
+- Grading is automatic: Good for a line with no misses, Again otherwise.
+  `grade()` still supports Easy, but the app no longer offers it.
 - New and learning cards: steps of 1 and 10 minutes. Good on a new card goes
-  to the 10-minute step; graduating gives 1 day, or 4 days with Easy.
-- Review: Good multiplies the interval by ease (starting at 2.5); Easy also
-  multiplies by 1.3 and raises ease by 0.15. Again lowers ease by 0.2
+  to the 10-minute step; graduating gives 1 day (4 days with Easy).
+- Review: Good multiplies the interval by ease (starting at 2.5); Easy would
+  also multiply by 1.3 and raise ease by 0.15. Again lowers ease by 0.2
   (minimum 1.3) and relearns with a 10-minute step, then 1 day.
 - Depth grows when a card passes `promoteAfter` reviews in a row; the card
   then goes back through the learning steps at the new depth.
@@ -67,17 +82,33 @@ mistake on it does not count.
 then new cards in deck order (within the daily limit if one is set), then
 learning cards due within 20 minutes.
 
+## Free play
+
+`tools/build_freeplay.mjs` picks the end positions of deck lines 6-14
+half-moves long with at least two minor pieces developed, one per unique
+position (piece placement, side to move, castling, en passant). For each it
+runs Stockfish with MultiPV 8 at a fixed node count, one thread and a cleared
+hash, so results are reproducible. A puzzle has up to 3 steps: the top 8 moves
+with scores (centipawns for the side to move; mate in n is 30000 - n), then
+the reply from the best move's principal variation, then the next step.
+
+`src/freeplay.js` judges the first try at each step: the top move is "best",
+another listed move within 20 centipawns is "good", anything else is a miss,
+after which only the top move continues. A puzzle is solved when no step was
+missed. Puzzles are picked at random among unseen ones, then never-solved
+ones, then any, filtered by the side setting.
+
 ## Storage
 
-Progress and settings are in `localStorage` (`chess_trainer.v1`). Export and
-import use a JSON backup file. On iOS, a home-screen app has its own storage,
+Progress, settings and free play stats are in `localStorage`
+(`chess_trainer.v1`). Export and import use a JSON backup file. On iOS, a home-screen app has its own storage,
 separate from Safari tabs.
 
 ## Later
 
 - "Name this opening" multiple-choice cards.
 - Continuing popular openings past their named moves into main-line theory.
-- Stockfish in the browser, to tell a playable move outside the line from a
-  mistake.
+- Stockfish in the browser, to tell a playable move outside a Learn line
+  from a mistake.
 - Importing the owner's Chess.com games to show where they left known lines.
 - Personal repertoire decks from PGN files or Lichess studies.

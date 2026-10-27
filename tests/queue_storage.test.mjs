@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { emptyFreeStats } from '../src/freeplay.js';
 import { counts, nextCard, noteNewCard } from '../src/queue.js';
 import { DEFAULT_SETTINGS, MINUTE, newCardState } from '../src/srs.js';
 import { emptyProgress, exportBackup, importBackup, loadProgress, normalizeSettings, saveProgress, STORAGE_KEY } from '../src/storage.js';
@@ -13,7 +14,7 @@ const deck = [
 ];
 
 function progressWith(cards, daily = null) {
-  return { cards, daily, settings: { ...DEFAULT_SETTINGS } };
+  return { cards, daily, settings: { ...DEFAULT_SETTINGS }, freeplay: emptyFreeStats() };
 }
 
 test('new cards come in deck order when nothing is due', () => {

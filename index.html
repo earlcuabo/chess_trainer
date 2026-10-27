@@ -22,15 +22,26 @@
     <header>
       <h1>Openings</h1>
       <div id="counts" aria-live="polite">
-        <span class="count new" title="New cards"><b id="count-new">0</b> new</span>
-        <span class="count learning" title="Learning cards due now"><b id="count-learning">0</b> learning</span>
-        <span class="count review" title="Reviews due now"><b id="count-review">0</b> due</span>
+        <span id="learn-counts">
+          <span class="count new" title="New cards"><b id="count-new">0</b> new</span>
+          <span class="count learning" title="Learning cards due now"><b id="count-learning">0</b> learning</span>
+          <span class="count review" title="Reviews due now"><b id="count-review">0</b> due</span>
+        </span>
+        <span id="free-counts" hidden>
+          <span class="count review" title="Positions solved"><b id="free-solved">0</b>/<b id="free-attempted">0</b> solved</span>
+          <span class="count new" title="Solved in a row"><b id="free-streak">0</b> streak</span>
+        </span>
       </div>
       <div class="header-buttons">
         <button id="stats-button" type="button" aria-label="Progress">Progress</button>
         <button id="settings-button" type="button" aria-label="Settings">Settings</button>
       </div>
     </header>
+
+    <nav id="mode-tabs" aria-label="Mode">
+      <button id="tab-learn" type="button" data-mode="learn" aria-pressed="true">Learn</button>
+      <button id="tab-free" type="button" data-mode="free" aria-pressed="false">Free play</button>
+    </nav>
 
     <section id="prompt" aria-live="polite">
       <div class="prompt-top">
@@ -50,14 +61,18 @@
     <section id="result" hidden>
       <p id="result-text"></p>
       <div class="grade-buttons">
-        <button id="again-button" type="button" class="again">Again <small></small></button>
-        <button id="good-button" type="button" class="good">Good <small></small></button>
-        <button id="easy-button" type="button" class="easy">Easy <small></small></button>
+        <button id="next-button" type="button" class="again">Next</button>
       </div>
     </section>
 
+    <section id="free-result" hidden>
+      <p id="free-result-text"></p>
+      <ol id="free-steps"></ol>
+      <button id="next-free-button" type="button" class="good">Next position</button>
+    </section>
+
     <section id="done" hidden>
-      <h2>All caught up</h2>
+      <h2 id="done-title">All caught up</h2>
       <p id="done-text"></p>
     </section>
   </main>
@@ -113,6 +128,10 @@
       <table id="stats-table"></table>
       <h3>Weakest openings</h3>
       <ol id="weakest"></ol>
+      <h3>Free play</h3>
+      <table id="free-stats-table"></table>
+      <h3>Recent free-play misses</h3>
+      <ol id="free-misses"></ol>
       <div class="dialog-buttons"><button value="close" type="submit">Close</button></div>
     </form>
   </dialog>

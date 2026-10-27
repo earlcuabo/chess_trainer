@@ -1,20 +1,26 @@
-// Page wiring: board, drill flow, grading buttons, settings, progress and
-// backup. Scheduling, queueing and drill rules live in the other modules.
+// Page wiring: board, Learn and Free play flows, grading buttons, settings,
+// progress and backup. Scheduling, queueing, drill and free-play rules live
+// in the other modules.
 import { Chessground } from '../vendor/chessground/chessground.min.js';
 import { Chess } from '../vendor/chess.js/chess.js';
 import { Drill } from './drill.js';
+import { emptyFreeStats, formatScore, FreePlay, pickPuzzle, recordFreePlay } from './freeplay.js';
 import { buildLine, finalAlternatives } from './line.js';
 import { counts, newCountToday, nextCard, noteNewCard } from './queue.js';
-import { dayStart, depthLimit, formatDelay, grade, newCardState, previewInterval } from './srs.js';
+import { dayStart, depthLimit, formatDelay, grade, newCardState } from './srs.js';
 import { exportBackup, importBackup, loadProgress, normalizeSettings, saveProgress } from './storage.js';
 
 const SPEEDS = { slow: 900, normal: 550, fast: 250 };
 const MATURE_DAYS = 21;
+const AUTO_NEXT_MS = 1200;
 const $ = (id) => document.getElementById(id);
 
 let deck = [];
 let progress = loadProgress(localStorage);
-let current = null; // { card, kind, line, drill, chess, state, session }
+// Learn: { mode, card, kind, line, drill, chess, side, state, session }
+// Free play: { mode, puzzle, game, chess, side, session }
+let current = null;
+let freePuzzles = null;
 let session = 0;
 
 const cg = Chessground($('board'), {
@@ -58,8 +64,8 @@ function syncBoard(lastMove, shapes = []) {
 }
 
 function enableInput(shapes = []) {
-  const { chess, card } = current;
-  cg.set({ turnColor: chess.turn() === 'w' ? 'white' : 'black', movable: { color: card.side === 'w' ? 'white' : 'black', dests: legalDests(chess) } });
+  const { chess, side } = current;
+  cg.set({ turnColor: chess.turn() === 'w' ? 'white' : 'black', movable: { color: side === 'w' ? 'white' : 'black', dests: legalDests(chess) } });
   cg.setAutoShapes(shapes);
 }
 
@@ -76,10 +82,41 @@ function flash(kind) {
 }
 
 function refreshCounts() {
+  const free = progress.settings.mode === 'free';
+  $('learn-counts').hidden = free;
+  $('free-counts').hidden = !free;
+  if (free) {
+    const stats = progress.freeplay;
+    $('free-solved').textContent = stats.solved;
+    $('free-attempted').textContent = stats.attempted;
+    $('free-streak').textContent = stats.streak;
+    return;
+  }
   const c = counts(deck, progress, progress.settings, Date.now());
   $('count-new').textContent = c.new;
   $('count-learning').textContent = c.learning;
   $('count-review').textContent = c.review;
+}
+
+function hidePanels() {
+  $('result').hidden = true;
+  $('free-result').hidden = true;
+  $('done').hidden = true;
+}
+
+function start(skipId = null) {
+  cg.set({ movable: { color: undefined, dests: new Map() } });
+  cg.setAutoShapes([]);
+  if (progress.settings.mode === 'free') startFree(skipId);
+  else startCard(skipId);
+}
+
+function setMode(mode) {
+  for (const tab of document.querySelectorAll('#mode-tabs button')) tab.setAttribute('aria-pressed', String(tab.dataset.mode === mode));
+  if (progress.settings.mode === mode && current) return;
+  progress.settings = { ...progress.settings, mode };
+  save();
+  start();
 }
 
 function renderLine() {
@@ -120,8 +157,7 @@ function renderPrompt() {
 function startCard(skipId = null) {
   session += 1;
   const mySession = session;
-  $('result').hidden = true;
-  $('done').hidden = true;
+  hidePanels();
   setStatus('');
   refreshCounts();
   const now = Date.now();
@@ -137,7 +173,7 @@ function startCard(skipId = null) {
   const depth = Math.min(state.depth, depthLimit(line.length, progress.settings));
   const drill = new Drill(line, card.side, depth, { finalAlternatives: finalAlternatives(card, line) });
   if (state.intro) drill.hintPlies = new Set([drill.startPly]);
-  current = { card, kind, line, drill, chess: new Chess(), state, session: mySession };
+  current = { mode: 'learn', card, kind, line, drill, chess: new Chess(), side: card.side, state, session: mySession };
   $('prompt').hidden = false;
   cg.set({ orientation: card.side === 'w' ? 'white' : 'black' });
   syncBoard(undefined);
@@ -176,12 +212,21 @@ async function runAutoMoves(mySession, first = false) {
   }
 }
 
-async function onUserMove(orig, dest) {
+function onUserMove(orig, dest) {
   if (!current) return;
+  if (current.mode === 'free') onFreeMove(orig, dest);
+  else onLearnMove(orig, dest);
+}
+
+function promotionFor(chess, orig, dest) {
+  const piece = chess.get(orig);
+  return piece && piece.type === 'p' && (dest[1] === '8' || dest[1] === '1') ? 'q' : '';
+}
+
+async function onLearnMove(orig, dest) {
   const mySession = current.session;
   const { drill, chess } = current;
-  const piece = chess.get(orig);
-  const promotion = piece && piece.type === 'p' && (dest[1] === '8' || dest[1] === '1') ? 'q' : '';
+  const promotion = promotionFor(chess, orig, dest);
   const uci = orig + dest + promotion;
   const before = drill.ply;
   const outcome = drill.submit(uci);
@@ -214,52 +259,45 @@ async function onUserMove(orig, dest) {
   enableInput(outcome.result === 'reveal' ? [{ orig: expected.from, dest: expected.to, brush: 'green' }] : []);
 }
 
+// A correct line is graded Good and the next card follows automatically; a
+// missed line is graded Again and waits for Next so the miss can be read.
 function finishCard() {
-  const { card, drill, state, line } = current;
-  const now = Date.now();
-  const settings = progress.settings;
+  const { card, drill, state, line, session: mySession } = current;
   cg.set({ movable: { color: undefined, dests: new Map() } });
-  const failed = drill.failed;
-  if (failed) {
+  const now = Date.now();
+  const next = recordAnswer(drill.failed ? 'again' : 'good', now);
+  const when = formatDelay(next.due - now);
+  if (drill.failed) {
     const missed = drill.missedPlies.map((ply) => `${Drill.moveLabel(ply)}${line[ply].san}`).join(', ');
-    $('result-text').textContent = `Missed ${missed}. This card comes back soon.`;
+    $('result-text').textContent = `Missed ${missed}. This card comes back in ${when}.`;
     setStatus('Line complete', 'bad');
-  } else {
-    $('result-text').textContent = `Correct: ${card.name}.`;
-    setStatus('Line complete', 'good');
+    $('result').hidden = false;
+    $('next-button').focus({ preventScroll: true });
+    return;
   }
-  $('again-button').hidden = !failed;
-  $('good-button').hidden = failed;
-  $('easy-button').hidden = failed;
-  const label = (result) => {
-    const next = grade(state, result, now, line.length, settings);
-    const delayLabel = previewInterval(state, result, now, line.length, settings);
-    return next.depth > state.depth ? `${delayLabel} · +1 move` : delayLabel;
-  };
-  $('again-button').querySelector('small').textContent = label('again');
-  $('good-button').querySelector('small').textContent = label('good');
-  $('easy-button').querySelector('small').textContent = label('easy');
-  $('result').hidden = false;
-  (failed ? $('again-button') : $('good-button')).focus({ preventScroll: true });
+  const grew = next.depth > state.depth ? ' with one more move' : '';
+  setStatus(`✓ Correct · back in ${when}${grew}`, 'good');
+  setTimeout(() => {
+    if (current && current.session === mySession) startCard(card.id);
+  }, AUTO_NEXT_MS);
 }
 
-function answer(result) {
-  if (!current || $('result').hidden) return;
+function recordAnswer(result, now) {
   const { card, drill, state, line } = current;
-  const now = Date.now();
   const next = grade(state, result, now, line.length, progress.settings);
   for (const ply of drill.missedPlies) next.misses[ply] = (next.misses[ply] ?? 0) + 1;
   if (state.state === 'new') progress = noteNewCard(progress, now);
   progress.cards[card.id] = next;
   save();
-  startCard(card.id);
+  return next;
 }
 
 function showDone(nextDue) {
   current = null;
   cg.set({ movable: { color: undefined, dests: new Map() } });
   cg.setAutoShapes([]);
-  $('result').hidden = true;
+  hidePanels();
+  $('done-title').textContent = 'All caught up';
   $('prompt').hidden = true;
   $('line').textContent = '';
   setStatus('');
@@ -271,6 +309,207 @@ function showDone(nextDue) {
   if (nextDue) parts.push(`Next card ${new Date(nextDue).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })} (in ${formatDelay(nextDue - now)}).`);
   $('done-text').textContent = parts.join(' ');
   $('done').hidden = false;
+}
+
+// Free play.
+async function loadFreePuzzles() {
+  if (!freePuzzles) {
+    const response = await fetch('data/freeplay.json');
+    if (response.status === 404) throw new Error('not built yet');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    freePuzzles = (await response.json()).puzzles;
+  }
+  return freePuzzles;
+}
+
+function showFreeUnavailable(text) {
+  current = null;
+  cg.set({ movable: { color: undefined, dests: new Map() } });
+  cg.setAutoShapes([]);
+  hidePanels();
+  $('prompt').hidden = true;
+  $('line').textContent = '';
+  setStatus('');
+  $('done-title').textContent = 'Free play';
+  $('done-text').textContent = text;
+  $('done').hidden = false;
+}
+
+async function startFree(skipId = null) {
+  session += 1;
+  const mySession = session;
+  hidePanels();
+  setStatus('');
+  refreshCounts();
+  try {
+    await loadFreePuzzles();
+  } catch (error) {
+    if (session !== mySession) return;
+    if (error.message === 'not built yet') showFreeUnavailable("Free play positions aren't available yet. Check back later today.");
+    else showFreeUnavailable(`Free play positions could not be loaded (${error.message}).`);
+    return;
+  }
+  if (session !== mySession) return;
+  const puzzle = pickPuzzle(freePuzzles, progress.freeplay, progress.settings.side, Math.random, skipId);
+  if (!puzzle) {
+    showFreeUnavailable('No free play positions match the side chosen in Settings.');
+    return;
+  }
+  const game = new FreePlay(puzzle);
+  const chess = new Chess();
+  puzzle.moves.split(' ').forEach((san) => chess.move(san));
+  current = { mode: 'free', puzzle, game, chess, side: game.side, session: mySession };
+  $('prompt').hidden = false;
+  cg.set({ orientation: game.side === 'w' ? 'white' : 'black' });
+  syncBoard(lastMoveSquares(chess));
+  renderFreePrompt();
+  renderFreeLine();
+  cg.redrawAll();
+  setStatus(`${colorName(game.side)} to move`, 'info');
+  enableInput();
+}
+
+function renderFreePrompt() {
+  const { puzzle, game } = current;
+  const badge = $('card-kind');
+  badge.textContent = 'Free play';
+  badge.dataset.kind = 'free';
+  $('card-eco').textContent = `${puzzle.eco} · you play ${colorName(game.side)}`;
+  $('card-name').textContent = puzzle.name;
+  const total = puzzle.steps.length;
+  $('card-task').textContent = game.done
+    ? 'Done.'
+    : `Find the engine's best move${total > 1 ? ` (${game.step + 1} of ${total})` : ''}.`;
+  $('depth-dots').innerHTML = puzzle.steps
+    .map((_, index) => {
+      const result = game.results[index];
+      const cls = result ? (result.verdict === 'miss' ? 'wrong' : 'right') : 'tested';
+      return `<i class="${cls}"></i>`;
+    })
+    .join('');
+}
+
+function renderFreeLine() {
+  const { chess, puzzle } = current;
+  const start = puzzle.moves.split(' ').length;
+  const parts = chess.history().map((san, ply) => {
+    const label = ply % 2 === 0 ? `${Drill.moveLabel(ply)} ` : '';
+    return `${label}<span class="${ply >= start ? 'tested' : ''}">${san}</span>`;
+  });
+  $('line').innerHTML = parts.join(' ');
+}
+
+function lastMoveSquares(chess) {
+  const last = chess.history({ verbose: true }).at(-1);
+  return last ? [last.from, last.to] : undefined;
+}
+
+function moveSquares(chess, san) {
+  const move = chess.move(san);
+  chess.undo();
+  return { orig: move.from, dest: move.to };
+}
+
+async function onFreeMove(orig, dest) {
+  const mySession = current.session;
+  const { game, chess } = current;
+  const promotion = promotionFor(chess, orig, dest);
+  const san = chess.move({ from: orig, to: dest, promotion: promotion || undefined }).san;
+  chess.undo();
+  const stepIndex = game.step;
+  const outcome = game.submit(san);
+  const alive = () => current && current.session === mySession;
+
+  if (outcome.verdict === 'best' || outcome.verdict === 'continue') {
+    chess.move(san);
+    syncBoard([orig, dest], [{ orig: dest, brush: 'green' }]);
+    if (outcome.verdict === 'best') {
+      flash('good');
+      setStatus(`✓ Best move: ${san} (${formatScore(outcome.score)})`, 'good');
+    }
+    renderFreePrompt();
+    renderFreeLine();
+    afterFreeStep(stepIndex, mySession);
+    return;
+  }
+  if (outcome.verdict === 'good') {
+    chess.move(san);
+    syncBoard([orig, dest], [{ orig: dest, brush: 'green' }]);
+    flash('good');
+    setStatus(`✓ ${san} is good (${formatScore(outcome.score)}). Engine's top: ${outcome.best} (${formatScore(outcome.bestScore)}). Continuing from there.`, 'good');
+    renderFreePrompt();
+    renderFreeLine();
+    await wait(1600);
+    if (!alive()) return;
+    chess.undo();
+    const best = chess.move(outcome.best);
+    syncBoard([best.from, best.to]);
+    renderFreeLine();
+    afterFreeStep(stepIndex, mySession);
+    return;
+  }
+  // A miss, or another wrong move after a miss.
+  flash('bad');
+  cg.set({ movable: { color: undefined, dests: new Map() } });
+  cg.setAutoShapes([{ orig: dest, brush: 'red' }]);
+  if (outcome.verdict === 'miss') {
+    const played = outcome.ranked ? `${san} (${formatScore(outcome.score)})` : `${san} is not in the engine's top 8`;
+    setStatus(`✗ ${played}. Best: ${outcome.best} (${formatScore(outcome.bestScore)}). Play it to continue.`, 'bad');
+    renderFreePrompt();
+  } else {
+    setStatus(`✗ Play ${outcome.best} to continue.`, 'bad');
+  }
+  await wait(500);
+  if (!alive()) return;
+  syncBoard(lastMoveSquares(chess));
+  enableInput([{ ...moveSquares(chess, outcome.best), brush: 'green' }]);
+}
+
+async function afterFreeStep(stepIndex, mySession) {
+  const { game, chess } = current;
+  const reply = game.replyAfter(stepIndex);
+  if (!reply || game.done) {
+    await wait(700);
+    if (current && current.session === mySession) finishFree();
+    return;
+  }
+  await wait(Math.max(delay(), 600));
+  if (!current || current.session !== mySession) return;
+  const move = chess.move(reply);
+  syncBoard([move.from, move.to]);
+  renderFreeLine();
+  renderFreePrompt();
+  setStatus(`Opponent played ${move.san}. Your move.`, 'info');
+  enableInput();
+}
+
+function finishFree() {
+  const { game, puzzle } = current;
+  cg.set({ movable: { color: undefined, dests: new Map() } });
+  progress.freeplay = recordFreePlay(progress.freeplay, game, Date.now());
+  save();
+  refreshCounts();
+  const missed = game.results.filter((result) => result.verdict === 'miss').length;
+  const total = game.results.length;
+  $('free-result-text').textContent = missed ? `Missed ${missed} of ${total}.` : `Solved: all ${total} found.`;
+  setStatus(missed ? 'Position complete' : '✓ Solved', missed ? 'bad' : 'good');
+  const startPly = puzzle.moves.split(' ').length;
+  const list = $('free-steps');
+  list.innerHTML = '';
+  game.results.forEach((result, index) => {
+    const item = document.createElement('li');
+    const verdict = document.createElement('span');
+    verdict.className = result.verdict;
+    const word = result.verdict === 'miss' ? 'missed' : result.verdict;
+    verdict.textContent = `${Drill.moveLabel(startPly + index * 2)}${result.played} ${word}`;
+    const note = document.createElement('small');
+    const yours = result.score == null ? 'not in top 8' : formatScore(result.score);
+    note.textContent = result.verdict === 'best' ? ` ${yours}` : ` ${yours} · best ${result.best} ${formatScore(result.bestScore)}`;
+    item.append(verdict, note);
+    list.append(item);
+  });
+  $('free-result').hidden = false;
+  $('next-free-button').focus({ preventScroll: true });
 }
 
 // Settings dialog.
@@ -293,10 +532,13 @@ $('settings-dialog').addEventListener('close', () => {
     promoteAfter: $('setting-promote').value,
     side: $('setting-side').value,
     speed: $('setting-speed').value,
+    mode: before.mode,
   });
   save();
   const after = progress.settings;
-  if (!current || before.side !== after.side || before.maxDepth !== after.maxDepth || before.newPerDay !== after.newPerDay) startCard();
+  if (after.mode === 'free') {
+    if (!current || before.side !== after.side) startFree();
+  } else if (!current || before.side !== after.side || before.maxDepth !== after.maxDepth || before.newPerDay !== after.newPerDay) startCard();
   else refreshCounts();
 });
 
@@ -331,7 +573,8 @@ $('import-file').addEventListener('change', async (event) => {
     progress = imported;
     save();
     $('settings-dialog').close();
-    startCard();
+    current = null;
+    setMode(progress.settings.mode);
   } catch (error) {
     alert(`Could not import: ${error.message}`);
   }
@@ -339,10 +582,10 @@ $('import-file').addEventListener('change', async (event) => {
 
 $('reset-button').addEventListener('click', () => {
   if (!confirm('Delete all progress on this device? Export a backup first if you might want it back.')) return;
-  progress = { cards: {}, daily: null, settings: progress.settings };
+  progress = { cards: {}, daily: null, settings: progress.settings, freeplay: emptyFreeStats() };
   save();
   $('settings-dialog').close();
-  startCard();
+  start();
 });
 
 // Progress dialog.
@@ -388,6 +631,25 @@ function openStats() {
     item.append(note);
     list.append(item);
   }
+  const free = progress.freeplay;
+  const percent = free.attempted ? ` (${Math.round((100 * free.solved) / free.attempted)}%)` : '';
+  $('free-stats-table').innerHTML = [
+    ['Positions played', free.attempted],
+    ['Solved', `${free.solved}${percent}`],
+    ['Current streak', free.streak],
+    ['Best streak', free.bestStreak],
+  ].map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+  const misses = $('free-misses');
+  misses.innerHTML = '';
+  if (!free.recent.length) misses.innerHTML = '<li>No misses yet.</li>';
+  for (const miss of free.recent.slice(0, 10)) {
+    const item = document.createElement('li');
+    item.textContent = miss.name;
+    const note = document.createElement('small');
+    note.textContent = `played ${miss.played}, best ${miss.best}`;
+    item.append(note);
+    misses.append(item);
+  }
   $('stats-dialog').showModal();
 }
 
@@ -395,13 +657,15 @@ $('settings-button').addEventListener('click', openSettings);
 $('stats-button').addEventListener('click', openStats);
 $('export-button').addEventListener('click', exportProgress);
 $('import-button').addEventListener('click', () => $('import-file').click());
-$('again-button').addEventListener('click', () => answer('again'));
-$('good-button').addEventListener('click', () => answer('good'));
-$('easy-button').addEventListener('click', () => answer('easy'));
+$('next-button').addEventListener('click', () => {
+  if (current && current.mode === 'learn') startCard(current.card.id);
+});
+$('next-free-button').addEventListener('click', () => startFree(current?.puzzle?.id ?? null));
+for (const tab of document.querySelectorAll('#mode-tabs button')) tab.addEventListener('click', () => setMode(tab.dataset.mode));
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible' || !deck.length) return;
-  if (!current) startCard();
+  if (!current && progress.settings.mode === 'learn') startCard();
   else refreshCounts();
 });
 
@@ -416,7 +680,7 @@ async function init() {
     return;
   }
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-  startCard();
+  setMode(progress.settings.mode);
 }
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

@@ -18,6 +18,11 @@ These instructions apply to all work under `C:\chess_trainer` on pc2
   bundled runtimes:
   - Node 24: `C:\Users\Cuabo\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe`
   - Python 3.12: `C:\Users\Cuabo\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe`
+- Stockfish 19 for `tools/build_freeplay.mjs` is at
+  `%LOCALAPPDATA%\chess_trainer_tools\stockfish_sf_19\stockfish\stockfish-windows-x86-64-universal.exe`.
+  Keep it out of this repository. pc2 also runs the market recorder, so long
+  analysis runs stay at low priority (the tool does this) with at most
+  3 workers.
 - There is no npm. Third-party code is vendored under `vendor/` with its
   license; do not load scripts from a CDN.
 

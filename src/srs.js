@@ -21,6 +21,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   promoteAfter: 3,
   side: 'both', // 'both' | 'w' | 'b'
   speed: 'normal', // 'slow' | 'normal' | 'fast'
+  mode: 'learn', // 'learn' | 'free'
 });
 
 export function newCardState() {
