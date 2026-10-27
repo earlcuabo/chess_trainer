@@ -27,6 +27,10 @@ Recorded from the owner's answers while designing the app.
   A move within 0.20 pawns of the best counts as correct (the owner chose this
   over "exact top move only"). Each position continues for up to 3 of the
   user's moves with the engine replying (chosen over one move per position).
+- **2026-10-27 — More Free play positions.** At the owner's request, added
+  positions partway through longer named lines (still 6-14 half-moves in),
+  growing Free play from 2,105 to 4,498 positions. Going up to 20 half-moves
+  (about 5,741) was offered as a later option.
 - **2026-10-27 — Free play engine.** Stockfish's answers are calculated ahead
   of time on pc2 and shipped as data, rather than running Stockfish on the
   phone: instant, stronger, smaller download, works offline. Stockfish itself
@@ -86,9 +90,13 @@ learning cards due within 20 minutes.
 
 ## Free play
 
-`tools/build_freeplay.mjs` picks the end positions of deck lines 6-14
-half-moves long with at least two minor pieces developed, one per unique
-position (piece placement, side to move, castling, en passant). For each it
+`tools/build_freeplay.mjs` picks positions 6-14 half-moves into deck lines
+with at least two minor pieces developed, one per unique position (piece
+placement, side to move, castling, en passant): first the end positions of
+lines that long (2,105, in deck order), then positions partway through longer
+lines (2,393 more, named after the latest named opening on their path), for
+4,498 in all. Keeping the end positions first keeps their order and ids
+stable when positions are added. For each it
 runs Stockfish with MultiPV 8 at a fixed node count, one thread and a cleared
 hash, so results are reproducible. A puzzle has up to 3 steps: the top 8 moves
 with scores (centipawns for the side to move; mate in n is 30000 - n), then

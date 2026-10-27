@@ -3,8 +3,9 @@
 //   node tools/build_freeplay.mjs --engine <stockfish.exe> [--nodes 1500000]
 //        [--workers 3] [--limit N] [--cache <file.jsonl>]
 //
-// Positions are the end positions of deck lines 6-14 half-moves long with at
-// least two minor pieces developed, one per unique position. Each puzzle has
+// Positions are 6-14 half-moves into deck lines (their end positions first,
+// then positions partway through longer lines) with at least two minor pieces
+// developed, one per unique position. Each puzzle has
 // up to STEPS steps: the user's best move, then the engine's reply from the
 // best move's principal variation, then the next step.
 //
@@ -48,19 +49,45 @@ export function developedMinors(chess) {
   return 8 - home;
 }
 
+function eligible(chess) {
+  return developedMinors(chess) >= 2 && !chess.isGameOver();
+}
+
+// End positions of deck lines come first, in deck order, so their puzzle
+// order and ids stay stable; then positions partway through longer lines,
+// each named after the latest named opening on its path.
 export function selectPositions(cards) {
   const seen = new Set();
   const positions = [];
-  for (const card of cards) {
-    const sans = card.moves.split(' ');
-    if (sans.length < MIN_PLIES || sans.length > MAX_PLIES) continue;
+  const named = new Map(); // position key -> first deck card ending there
+  const lines = cards.map((card) => {
     const chess = new Chess();
-    sans.forEach((san) => chess.move(san));
-    if (developedMinors(chess) < 2 || chess.isGameOver()) continue;
-    const key = positionKey(chess.fen());
-    if (seen.has(key)) continue;
-    seen.add(key);
+    const keys = card.moves.split(' ').map((san) => {
+      chess.move(san);
+      return positionKey(chess.fen());
+    });
+    if (!named.has(keys.at(-1))) named.set(keys.at(-1), card);
+    return { card, sans: card.moves.split(' '), keys, chess };
+  });
+
+  for (const { card, sans, keys, chess } of lines) {
+    if (sans.length < MIN_PLIES || sans.length > MAX_PLIES || !eligible(chess)) continue;
+    if (seen.has(keys.at(-1))) continue;
+    seen.add(keys.at(-1));
     positions.push({ eco: card.eco, name: card.name, moves: card.moves });
+  }
+
+  for (const { card, sans, keys } of lines) {
+    const chess = new Chess();
+    let label = null;
+    for (let ply = 1; ply < Math.min(sans.length, MAX_PLIES + 1); ply += 1) {
+      chess.move(sans[ply - 1]);
+      label = named.get(keys[ply - 1]) ?? label;
+      if (ply < MIN_PLIES || seen.has(keys[ply - 1]) || !eligible(chess)) continue;
+      seen.add(keys[ply - 1]);
+      const source = label ?? card;
+      positions.push({ eco: source.eco, name: source.name, moves: sans.slice(0, ply).join(' ') });
+    }
   }
   return positions;
 }

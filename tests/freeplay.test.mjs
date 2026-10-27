@@ -102,6 +102,20 @@ test('positions need 6-14 half-moves, two developed minor pieces, and are unique
   assert.equal(developedMinors(chess), 2);
 });
 
+test('positions partway through longer lines follow the end positions, named after the latest opening on the path', () => {
+  const cards = [
+    { eco: 'C50', name: 'Italian Game', moves: 'e4 e5 Nf3 Nc6 Bc4' },
+    { eco: 'C55', name: 'Two Knights Long', moves: 'e4 e5 Nf3 Nc6 Bc4 Nf6 d3 Be7' },
+    { eco: 'C50', name: 'Giuoco Piano', moves: 'e4 e5 Nf3 Nc6 Bc4 Bc5' },
+  ];
+  assert.deepEqual(selectPositions(cards), [
+    { eco: 'C55', name: 'Two Knights Long', moves: 'e4 e5 Nf3 Nc6 Bc4 Nf6 d3 Be7' },
+    { eco: 'C50', name: 'Giuoco Piano', moves: 'e4 e5 Nf3 Nc6 Bc4 Bc5' },
+    { eco: 'C50', name: 'Italian Game', moves: 'e4 e5 Nf3 Nc6 Bc4 Nf6' },
+    { eco: 'C50', name: 'Italian Game', moves: 'e4 e5 Nf3 Nc6 Bc4 Nf6 d3' },
+  ]);
+});
+
 test('engine output parsing keeps the last full line per multipv and skips bound lines', () => {
   const lines = parseInfoLines([
     'info depth 10 multipv 1 score cp 20 nodes 5 pv e2e4 e7e5',

@@ -40,8 +40,10 @@ web page that installs like an app on a phone and works offline.
 Switch to **Free play** at the top. It is not scheduled and does not affect
 your Learn cards.
 
-- You get a real opening position a few moves in (6-14 half-moves, with at
-  least two knights or bishops developed) and find Stockfish's best move.
+- You get one of 4,498 real opening positions a few moves in (6-14
+  half-moves, with at least two knights or bishops developed): the end
+  positions of named lines, plus positions partway through longer named
+  lines. Find Stockfish's best move.
 - The best move, or any move within 0.20 pawns of it, counts as correct; you
   are also shown the engine's top choice and both scores.
 - The engine then replies and you find the best move again, for up to
