@@ -13,6 +13,7 @@ import { exportBackup, importBackup, loadProgress, normalizeSettings, saveProgre
 const SPEEDS = { slow: 900, normal: 550, fast: 250 };
 const MATURE_DAYS = 21;
 const AUTO_NEXT_MS = 1200;
+const REVEAL_MS = 1000;
 const $ = (id) => document.getElementById(id);
 
 let deck = [];
@@ -99,7 +100,6 @@ function refreshCounts() {
 }
 
 function hidePanels() {
-  $('result').hidden = true;
   $('free-result').hidden = true;
   $('done').hidden = true;
 }
@@ -245,22 +245,36 @@ async function onLearnMove(orig, dest) {
     }
     return;
   }
+  // Wrong: take the move back, show the right one with an arrow, then play
+  // it and carry on with the line.
+  const alive = () => current && current.session === mySession;
   flash('bad');
   renderDots();
   cg.set({ movable: { color: undefined, dests: new Map() } });
   cg.setAutoShapes([{ orig: dest, brush: 'red' }]);
   const expected = outcome.move;
-  if (outcome.result === 'retry') setStatus('✗ Not this line, try again', 'bad');
-  else setStatus(`✗ The move is ${Drill.moveLabel(before)}${expected.san}. Play it to continue.`, 'bad');
+  setStatus(`✗ The move is ${Drill.moveLabel(before)}${expected.san}`, 'bad');
   await wait(500);
-  if (!current || current.session !== mySession) return;
+  if (!alive()) return;
   const last = before > 0 ? [current.line[before - 1].from, current.line[before - 1].to] : undefined;
-  syncBoard(last);
-  enableInput(outcome.result === 'reveal' ? [{ orig: expected.from, dest: expected.to, brush: 'green' }] : []);
+  syncBoard(last, [{ orig: expected.from, dest: expected.to, brush: 'green' }]);
+  await wait(REVEAL_MS);
+  if (!alive()) return;
+  drill.playExpected();
+  chess.move(expected.san);
+  syncBoard([expected.from, expected.to]);
+  renderLine();
+  renderDots();
+  if (drill.done) {
+    await wait(350);
+    if (alive()) finishCard();
+  } else {
+    runAutoMoves(mySession);
+  }
 }
 
-// A correct line is graded Good and the next card follows automatically; a
-// missed line is graded Again and waits for Next so the miss can be read.
+// The line is graded automatically (Good if nothing was missed, Again
+// otherwise) and the next card follows after a moment.
 function finishCard() {
   const { card, drill, state, line, session: mySession } = current;
   cg.set({ movable: { color: undefined, dests: new Map() } });
@@ -269,14 +283,11 @@ function finishCard() {
   const when = formatDelay(next.due - now);
   if (drill.failed) {
     const missed = drill.missedPlies.map((ply) => `${Drill.moveLabel(ply)}${line[ply].san}`).join(', ');
-    $('result-text').textContent = `Missed ${missed}. This card comes back in ${when}.`;
-    setStatus('Line complete', 'bad');
-    $('result').hidden = false;
-    $('next-button').focus({ preventScroll: true });
-    return;
+    setStatus(`✗ Missed ${missed} · back in ${when}`, 'bad');
+  } else {
+    const grew = next.depth > state.depth ? ' with one more move' : '';
+    setStatus(`✓ Correct · back in ${when}${grew}`, 'good');
   }
-  const grew = next.depth > state.depth ? ' with one more move' : '';
-  setStatus(`✓ Correct · back in ${when}${grew}`, 'good');
   setTimeout(() => {
     if (current && current.session === mySession) startCard(card.id);
   }, AUTO_NEXT_MS);
@@ -657,9 +668,6 @@ $('settings-button').addEventListener('click', openSettings);
 $('stats-button').addEventListener('click', openStats);
 $('export-button').addEventListener('click', exportProgress);
 $('import-button').addEventListener('click', () => $('import-file').click());
-$('next-button').addEventListener('click', () => {
-  if (current && current.mode === 'learn') startCard(current.card.id);
-});
 $('next-free-button').addEventListener('click', () => startFree(current?.puzzle?.id ?? null));
 for (const tab of document.querySelectorAll('#mode-tabs button')) tab.addEventListener('click', () => setMode(tab.dataset.mode));
 

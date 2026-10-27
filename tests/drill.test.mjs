@@ -40,16 +40,28 @@ test('depth is clamped to the number of user moves', () => {
   assert.deepEqual(playAuto(drill), []);
 });
 
-test('a wrong move is retried once, then revealed, and fails the card', () => {
+test('a wrong move reveals the answer at once and fails the card', () => {
   const drill = new Drill(italian, 'w', 1);
   playAuto(drill);
-  assert.equal(drill.submit('f1b5').result, 'retry');
-  const second = drill.submit('d2d4');
-  assert.equal(second.result, 'reveal');
-  assert.equal(second.move.san, 'Bc4');
-  assert.equal(drill.submit('f1c4').result, 'correct');
+  const outcome = drill.submit('f1b5');
+  assert.equal(outcome.result, 'reveal');
+  assert.equal(outcome.move.san, 'Bc4');
+  assert.equal(drill.playExpected().san, 'Bc4');
+  assert.ok(drill.done);
   assert.ok(drill.failed);
   assert.deepEqual(drill.missedPlies, [4]);
+});
+
+test('after a revealed move the line carries on', () => {
+  const drill = new Drill(italian, 'w', 2);
+  playAuto(drill);
+  assert.equal(drill.submit('d2d4').result, 'reveal');
+  drill.playExpected();
+  assert.deepEqual(playAuto(drill), ['Nc6']);
+  assert.equal(drill.submit('f1c4').result, 'correct');
+  assert.ok(drill.done);
+  assert.deepEqual(drill.missedPlies, [2]);
+  assert.throws(() => drill.playExpected(), /not the user/);
 });
 
 test('black lines test black moves', () => {
@@ -77,8 +89,8 @@ test('mistakes on a hinted move do not fail the card', () => {
   const drill = new Drill(italian, 'w', 1, { hintPlies: [4] });
   playAuto(drill);
   assert.ok(drill.shouldHint());
-  drill.submit('f1b5');
-  drill.submit('f1c4');
+  assert.equal(drill.submit('f1b5').result, 'reveal');
+  drill.playExpected();
   assert.equal(drill.failed, false);
 });
 

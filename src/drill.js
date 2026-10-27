@@ -1,12 +1,13 @@
 // One attempt at a card. Moves before the tested section are played
 // automatically; within it, the opponent's moves are played automatically
-// and the user must find each of their own moves. A wrong move is taken back
-// once; a second wrong move reveals the answer. Any wrong move fails the card.
+// and the user must find each of their own moves. A wrong move reveals the
+// answer, which the app then plays with playExpected(). Any wrong move fails
+// the card.
 //
 // `line` is [{ san, uci }] for every half-move; `finalAlternatives` lists
 // other UCI moves that also reach the named opening on the last move.
 
-export const TRIES_BEFORE_REVEAL = 2;
+export const TRIES_BEFORE_REVEAL = 1;
 
 export class Drill {
   constructor(line, side, depth, { finalAlternatives = [], hintPlies = [] } = {}) {
@@ -69,6 +70,15 @@ export class Drill {
     this.tries += 1;
     if (!this.missedPlies.includes(this.ply) && !this.hintPlies.has(this.ply)) this.missedPlies.push(this.ply);
     return { result: this.tries >= TRIES_BEFORE_REVEAL ? 'reveal' : 'retry', move: expected };
+  }
+
+  // Plays the expected move for the user after a reveal.
+  playExpected() {
+    if (!this.isUserTurn()) throw new Error("not the user's turn");
+    const move = this.line[this.ply];
+    this.ply += 1;
+    this.tries = 0;
+    return move;
   }
 
   // Move number label for a ply, e.g. "3." or "3...".

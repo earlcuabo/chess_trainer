@@ -24,13 +24,13 @@ web page that installs like an app on a phone and works offline.
   whole line from move 1.
 - New cards come easy-first: about 36 core openings, then the main variations
   of those openings, then everything else, shorter lines first.
-- A wrong move is taken back and you get one more try; a second wrong move
-  shows the answer with an arrow. Any wrong move fails the card, and it comes
-  back in 10 minutes.
+- A wrong move is taken back, the right move is shown with an arrow for a
+  second and then played for you, and the line carries on. Any wrong move
+  fails the card, and it comes back in 10 minutes.
 - Scheduling follows Anki's classic SM-2: learning steps of 1 and 10 minutes,
-  then days that grow with each correct review. There are no grade buttons:
-  a correct line counts as Good and the next card follows on its own; after
-  a missed line, read the miss and tap **Next**.
+  then days that grow with each correct review. There are no buttons to tap:
+  a correct line counts as Good, a missed one as Again, and the next card
+  follows on its own.
   Days roll over at 4am.
 - Settings: new cards per day (no limit by default), maximum depth (10),
   correct reviews before depth grows (3), White/Black/both, and move speed.

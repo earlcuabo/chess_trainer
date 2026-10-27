@@ -33,8 +33,10 @@ Recorded from the owner's answers while designing the app.
   is kept on pc2 only, not in this repository.
 - **2026-10-27 — No grade buttons.** A correct line is graded Good
   automatically and the next card follows after a moment; the Good/Easy
-  buttons were removed at the owner's request. A missed line is graded Again
-  and waits for a Next tap so the miss can be read.
+  buttons were removed at the owner's request. A missed line is graded Again.
+- **2026-10-27 — Misses in Learn.** No second try and no confirmation: the
+  first wrong move shows the right move for about a second, the app plays it,
+  and the line continues; the next card follows automatically.
 
 ## Cards
 
@@ -58,8 +60,8 @@ Recorded from the owner's answers while designing the app.
 
 `src/drill.js`: with depth *d*, the user plays the last *d* of their moves;
 every move before the first of those, and every opponent move after it, is
-played automatically. A wrong move is retried once, then the answer is shown;
-any wrong move fails the card. On a card's first showing, and the first
+played automatically. A wrong move reveals the answer, which the app plays
+for the user (`playExpected`); any wrong move fails the card. On a card's first showing, and the first
 showing after its depth grows, the new move is shown with an arrow and a
 mistake on it does not count.
 
