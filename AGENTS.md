@@ -21,8 +21,10 @@ These instructions apply to all work under `C:\chess_trainer` on pc2
 - Stockfish 19 for `tools/build_freeplay.mjs` is at
   `%LOCALAPPDATA%\chess_trainer_tools\stockfish_sf_19\stockfish\stockfish-windows-x86-64-universal.exe`.
   Keep it out of this repository. pc2 also runs the market recorder, so long
-  analysis runs stay at low priority (the tool does this) with at most
-  3 workers.
+  analysis runs stay at low priority (the tool does this) and run after the
+  market close, with up to 4 workers (pc2 has 4 cores). The 2026-10-27 full
+  build took about 2 hours (Stockfish 19, 1.5M nodes, 3 steps, 2,105
+  positions).
 - There is no npm. Third-party code is vendored under `vendor/` with its
   license; do not load scripts from a CDN.
 
