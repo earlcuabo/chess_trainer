@@ -1,0 +1,59 @@
+:root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif;background:#10151b;color:#dde5ef;-webkit-text-size-adjust:100%}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;width:100%;overflow-x:hidden}
+body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+main{max-width:600px;margin:auto;padding:10px 10px 24px;display:flex;flex-direction:column;gap:10px}
+header{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+h1{font-size:20px;margin:0}
+h2{font-size:19px;margin:4px 0}
+h3{font-size:15px;margin:18px 0 6px;color:#b8c8db}
+#counts{display:flex;gap:10px;font-size:13px;color:#97a8bb;font-variant-numeric:tabular-nums}
+.count b{font-weight:700}.count.new b{color:#5aa9ff}.count.learning b{color:#efb295}.count.review b{color:#40c5ad}
+.header-buttons{display:flex;gap:6px}
+button,select,input{background:#202b38;color:#edf4fc;border:1px solid #455568;border-radius:6px;padding:10px 12px;font-size:16px;min-height:44px;font-family:inherit}
+button{cursor:pointer;touch-action:manipulation}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid #8bd2c6}
+header button{padding:6px 10px;font-size:14px;min-height:36px}
+#prompt{background:#18212b;border:1px solid #2b3949;border-radius:8px;padding:10px 12px}
+.prompt-top{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#97a8bb}
+.badge{border-radius:4px;padding:2px 7px;font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.03em;background:#2b3949}
+.badge[data-kind=new]{background:rgba(90,169,255,.2);color:#8cc4ff}
+.badge[data-kind=learning]{background:rgba(239,178,149,.18);color:#efb295}
+.badge[data-kind=review]{background:rgba(64,197,173,.18);color:#61d8c2}
+#card-task{margin:2px 0 6px;color:#b8c8db;font-size:15px}
+#depth-dots{display:flex;gap:5px;flex-wrap:wrap}
+#depth-dots i{width:10px;height:10px;border-radius:50%;background:#334354}
+#depth-dots i.tested{background:#5aa9ff}
+#depth-dots i.right{background:#40c5ad}
+#depth-dots i.wrong{background:#eb7979}
+#board-wrap{width:min(100%,62vh);margin:0 auto;aspect-ratio:1/1}
+#board{width:100%;height:100%}
+#board-wrap.flash-good{animation:flash-good .45s}
+#board-wrap.flash-bad{animation:flash-bad .45s}
+@keyframes flash-good{0%{box-shadow:0 0 0 0 rgba(64,197,173,.9)}100%{box-shadow:0 0 0 14px rgba(64,197,173,0)}}
+@keyframes flash-bad{0%{box-shadow:0 0 0 0 rgba(235,121,121,.95)}100%{box-shadow:0 0 0 14px rgba(235,121,121,0)}}
+#status{min-height:24px;margin:0;font-size:16px;text-align:center;font-weight:600}
+#status.good{color:#61d8c2}#status.bad{color:#ff9292}#status.info{color:#8cc4ff}
+#line{margin:0;text-align:center;color:#97a8bb;font-size:14px;line-height:1.6;min-height:22px}
+#line .missed{color:#ff9292;font-weight:700}#line .tested{color:#dde5ef}
+#result,#done{background:#18212b;border:1px solid #2b3949;border-radius:8px;padding:12px}
+#result-text{margin:0 0 10px}
+.grade-buttons{display:flex;gap:8px}
+.grade-buttons button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-weight:650}
+.grade-buttons small{font-weight:400;font-size:12px;color:#b8c8db}
+button.again{border-color:#eb7979;background:rgba(235,121,121,.14)}
+button.good{border-color:#40c5ad;background:rgba(64,197,173,.14)}
+button.easy{border-color:#5aa9ff;background:rgba(90,169,255,.14)}
+dialog{background:#151c24;color:#dde5ef;border:1px solid #2b3949;border-radius:10px;width:min(94vw,460px);max-height:88vh;padding:16px}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+dialog label{display:flex;flex-direction:column;gap:6px;margin:10px 0;font-size:14px}
+dialog small,.hint{color:#97a8bb;font-size:13px}
+.dialog-buttons{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.dialog-buttons button{flex:1}
+#stats-table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+#stats-table td{padding:6px 4px;border-top:1px solid #2b3949}
+#stats-table td:last-child{text-align:right;font-weight:650}
+#weakest{padding-left:20px;font-size:14px;line-height:1.6}
+#weakest small{margin-left:6px}
+a{color:#8bd2c6}

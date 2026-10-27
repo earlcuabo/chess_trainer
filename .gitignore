@@ -1,0 +1,4 @@
+node_modules/
+*.log
+chess-trainer-backup-*.json
+

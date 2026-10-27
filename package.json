@@ -1,0 +1,11 @@
+{
+  "name": "chess_trainer",
+  "private": true,
+  "type": "module",
+  "description": "Chess opening trainer with spaced repetition (installable web page).",
+  "scripts": {
+    "build:deck": "node tools/build_openings.mjs",
+    "test": "node --test \"tests/*.test.mjs\""
+  },
+  "license": "GPL-3.0-or-later"
+}

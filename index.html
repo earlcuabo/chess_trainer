@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#10151b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Openings">
+  <title>Chess Opening Trainer</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="vendor/chessground/chessground.base.css">
+  <link rel="stylesheet" href="vendor/chessground/chessground.brown.css">
+  <link rel="stylesheet" href="vendor/chessground/chessground.cburnett.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Openings</h1>
+      <div id="counts" aria-live="polite">
+        <span class="count new" title="New cards"><b id="count-new">0</b> new</span>
+        <span class="count learning" title="Learning cards due now"><b id="count-learning">0</b> learning</span>
+        <span class="count review" title="Reviews due now"><b id="count-review">0</b> due</span>
+      </div>
+      <div class="header-buttons">
+        <button id="stats-button" type="button" aria-label="Progress">Progress</button>
+        <button id="settings-button" type="button" aria-label="Settings">Settings</button>
+      </div>
+    </header>
+
+    <section id="prompt" aria-live="polite">
+      <div class="prompt-top">
+        <span id="card-kind" class="badge"></span>
+        <span id="card-eco"></span>
+      </div>
+      <h2 id="card-name">Loading openings…</h2>
+      <p id="card-task"></p>
+      <div id="depth-dots" aria-hidden="true"></div>
+    </section>
+
+    <div id="board-wrap"><div id="board"></div></div>
+
+    <p id="status" aria-live="assertive"></p>
+    <p id="line"></p>
+
+    <section id="result" hidden>
+      <p id="result-text"></p>
+      <div class="grade-buttons">
+        <button id="again-button" type="button" class="again">Again <small></small></button>
+        <button id="good-button" type="button" class="good">Good <small></small></button>
+        <button id="easy-button" type="button" class="easy">Easy <small></small></button>
+      </div>
+    </section>
+
+    <section id="done" hidden>
+      <h2>All caught up</h2>
+      <p id="done-text"></p>
+    </section>
+  </main>
+
+  <dialog id="settings-dialog">
+    <form method="dialog" id="settings-form">
+      <h2 tabindex="-1" autofocus>Settings</h2>
+      <label>New cards per day
+        <input id="setting-new" name="newPerDay" type="number" min="0" inputmode="numeric" placeholder="No limit">
+        <small>Leave empty for no limit.</small>
+      </label>
+      <label>Maximum depth (your moves per line)
+        <input id="setting-depth" name="maxDepth" type="number" min="1" max="30" inputmode="numeric">
+      </label>
+      <label>Correct reviews in a row before depth grows
+        <input id="setting-promote" name="promoteAfter" type="number" min="1" max="10" inputmode="numeric">
+      </label>
+      <label>Practice as
+        <select id="setting-side" name="side">
+          <option value="both">White and Black</option>
+          <option value="w">White only</option>
+          <option value="b">Black only</option>
+        </select>
+      </label>
+      <label>Move speed
+        <select id="setting-speed" name="speed">
+          <option value="slow">Slow</option>
+          <option value="normal">Normal</option>
+          <option value="fast">Fast</option>
+        </select>
+      </label>
+      <div class="dialog-buttons">
+        <button value="cancel" type="submit" formnovalidate>Cancel</button>
+        <button value="save" type="submit" class="good">Save</button>
+      </div>
+      <h3>Backup</h3>
+      <p class="hint">Progress is stored only on this device. Export a backup now and then.</p>
+      <div class="dialog-buttons">
+        <button id="export-button" type="button">Export progress</button>
+        <button id="import-button" type="button">Import progress</button>
+        <input id="import-file" type="file" accept="application/json,.json" hidden>
+      </div>
+      <div class="dialog-buttons">
+        <button id="reset-button" type="button" class="again">Reset all progress</button>
+      </div>
+      <p class="hint">Opening names: <a href="https://github.com/lichess-org/chess-openings" target="_blank" rel="noopener">lichess-org/chess-openings</a> (CC0).</p>
+    </form>
+  </dialog>
+
+  <dialog id="stats-dialog">
+    <form method="dialog">
+      <h2 tabindex="-1" autofocus>Progress</h2>
+      <table id="stats-table"></table>
+      <h3>Weakest openings</h3>
+      <ol id="weakest"></ol>
+      <div class="dialog-buttons"><button value="close" type="submit">Close</button></div>
+    </form>
+  </dialog>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
